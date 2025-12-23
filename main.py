@@ -136,6 +136,26 @@ async def partial_update_book(book_id: int, book_update: BookUpdate, api_key: st
     db.refresh(book)
     return book
 
+# GET /api/stats/books - Получение статистики
+@app.get("/api/stats/books", tags=["Statistics"])
+async def get_statistics(db: Session = Depends(get_db)):
+    """
+    Получить статистику по книгам.
+    Возвращает общее количество книг, распределение по авторам и векам.
+    """
+    from collections import Counter
+
+    books = db.query(BookDB).all()
+    total_books = len(books)
+    authors = Counter(book.author for book in books)
+    centuries = Counter(book.year // 100 + 1 for book in books)
+
+    return {
+        "total_books": total_books,
+        "books_by_author": dict(authors),
+        "books_by_century": {f"{century} век": count for century, count in centuries.items()}
+    }
+
 # DELETE /api/books/{book_id} - Удаление книги (требуется аутентификация)
 @app.delete("/api/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Books"])
 async def delete_book(book_id: int, api_key: str = Depends(verify_api_key), db: Session = Depends(get_db)):
@@ -151,30 +171,10 @@ async def delete_book(book_id: int, api_key: str = Depends(verify_api_key), db: 
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Книга с ID {book_id} не найдена"
         )
-    
+
     db.delete(book)
     db.commit()
     return
-
-# GET /api/books/stats - Получение статистики
-@app.get("/api/books/stats", tags=["Statistics"])
-async def get_statistics(db: Session = Depends(get_db)):
-    """
-    Получить статистику по книгам.
-    Возвращает общее количество книг, распределение по авторам и векам.
-    """
-    from collections import Counter
-    
-    books = db.query(BookDB).all()
-    total_books = len(books)
-    authors = Counter(book.author for book in books)
-    centuries = Counter(book.year // 100 + 1 for book in books)
-    
-    return {
-        "total_books": total_books,
-        "books_by_author": dict(authors),
-        "books_by_century": {f"{century} век": count for century, count in centuries.items()}
-    }
 
 # Точка входа для запуска приложения
 if __name__ == "__main__":
